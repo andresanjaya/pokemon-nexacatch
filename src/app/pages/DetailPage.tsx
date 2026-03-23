@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Heart, Weight, Ruler, Zap, Shield, ChevronLeft, ChevronRight, Dna } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { usePokemonById } from '../hooks/usePokemon';
-import { fetchPokemonMegaForms, MegaFormInfo } from '../services/pokeapi';
+import { fetchPokemonMegaForms, fetchAbilityDescription, MegaFormInfo } from '../services/pokeapi';
 import { TypeBadge } from '../components/TypeBadge';
 import { StatBar } from '../components/StatBar';
 import { motion, AnimatePresence } from 'motion/react';
@@ -17,6 +17,9 @@ export function DetailPage(): JSX.Element {
   const [isFavorite, setIsFavorite] = useState(false);
   const [megaForms, setMegaForms] = useState<MegaFormInfo[]>([]);
   const [loadingMegaForms, setLoadingMegaForms] = useState(false);
+  const [selectedAbility, setSelectedAbility] = useState<string | null>(null);
+  const [abilityDescription, setAbilityDescription] = useState('');
+  const [loadingAbility, setLoadingAbility] = useState(false);
 
   // Check if pokemon is favorited
   useEffect(() => {
@@ -76,6 +79,16 @@ export function DetailPage(): JSX.Element {
 
     localStorage.setItem('favoritePokemon', JSON.stringify(ids));
     setIsFavorite(!isFavorite);
+  };
+
+  const handleAbilityClick = async (ability: string) => {
+    setSelectedAbility(ability);
+    setAbilityDescription('');
+    setLoadingAbility(true);
+
+    const description = await fetchAbilityDescription(ability);
+    setAbilityDescription(description);
+    setLoadingAbility(false);
   };
 
   if (loading) {
@@ -281,17 +294,54 @@ export function DetailPage(): JSX.Element {
             </h2>
             <div className="flex flex-wrap gap-2">
               {pokemon.abilities.map((ability, index) => (
-                <div
+                <button
                   key={index}
-                  className="px-4 py-2 bg-gray-100 rounded-full font-semibold text-gray-700 capitalize text-sm"
+                  onClick={() => handleAbilityClick(ability)}
+                  className="px-4 py-2 bg-gray-100 rounded-full font-semibold text-gray-700 capitalize text-sm hover:bg-gray-200 transition-colors"
                 >
                   {ability}
-                </div>
+                </button>
               ))}
             </div>
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {selectedAbility && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center px-4"
+            onClick={() => setSelectedAbility(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 16 }}
+              className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-black text-gray-900 capitalize mb-2">{selectedAbility}</h3>
+              <p className="text-xs font-bold uppercase tracking-wide text-blue-500 mb-3">Ability Description</p>
+
+              {loadingAbility ? (
+                <div className="py-4 text-gray-500 font-medium">Loading ability info...</div>
+              ) : (
+                <p className="text-gray-700 leading-relaxed text-sm">{abilityDescription}</p>
+              )}
+
+              <button
+                onClick={() => setSelectedAbility(null)}
+                className="mt-5 w-full bg-blue-500 text-white font-bold py-3 rounded-xl hover:bg-blue-600 transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Evolution Chain */}
       {pokemon.evolution && (pokemon.evolution.prev || pokemon.evolution.next) && (

@@ -51,6 +51,7 @@ export interface Pokemon {
   abilities: string[];
   description: string;
   image: string;
+  pixelImage?: string;
   weight: number; // in kg
   height: number; // in m
   weaknesses: Weakness[];

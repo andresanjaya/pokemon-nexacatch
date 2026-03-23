@@ -171,8 +171,50 @@ export function EnemyEncounterPage() {
 
   if (!team || !enemy) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen pb-20 bg-[linear-gradient(180deg,#1f2a44_0%,#1c3a56_40%,#2f7b7e_100%)] relative overflow-hidden flex items-center justify-center">
+        <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-[#5fd0d6]/20 blur-2xl" />
+        <div className="absolute -bottom-20 -right-8 w-64 h-64 rounded-full bg-[#f9d35b]/20 blur-2xl" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 w-[86%] max-w-sm rounded-3xl border-2 border-[#9bd2c4]/40 bg-[#0d1f31]/70 backdrop-blur-md p-6 shadow-2xl"
+        >
+          <div className="flex items-center justify-center mb-5">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
+              className="relative w-16 h-16"
+            >
+              <div className="absolute inset-0 rounded-full bg-white border-4 border-[#1b2839] overflow-hidden">
+                <div className="absolute inset-x-0 top-0 h-1/2 bg-[#d93636]" />
+                <div className="absolute inset-x-0 top-1/2 h-[4px] -translate-y-1/2 bg-[#1b2839]" />
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white border-4 border-[#1b2839]" />
+              </div>
+            </motion.div>
+          </div>
+
+          <h2 className="text-center text-[#f6fbff] text-xl font-black tracking-wide mb-2">
+            ENTERING BATTLE
+          </h2>
+          <p className="text-center text-[#c4deef] text-sm mb-5">
+            Menyiapkan lawan, moves, dan arena...
+          </p>
+
+          <div className="h-2 w-full rounded-full bg-[#16314b] overflow-hidden border border-[#3f6a8a]">
+            <motion.div
+              className="h-full bg-[linear-gradient(90deg,#f8d44c_0%,#f28f45_60%,#de5e3c_100%)]"
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+              style={{ width: '55%' }}
+            />
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-2 text-[#9bd2c4] text-xs font-semibold uppercase tracking-[0.18em]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#9bd2c4] animate-pulse" />
+            <span>Loading</span>
+          </div>
+        </motion.div>
       </div>
     );
   }

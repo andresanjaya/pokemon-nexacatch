@@ -6,7 +6,7 @@ interface PokedexHeaderProps {
 
 export function PokedexHeader({ title, leftButton, rightButton }: PokedexHeaderProps) {
   return (
-    <div className="bg-gradient-to-b from-red-600 to-red-700 px-4 pt-4 pb-6 rounded-b-3xl shadow-xl relative">
+    <div className="bg-gradient-to-b from-red-600 to-red-700 px-4 pt-4 pb-2 rounded-b-3xl shadow-xl relative">
       {/* Top section with circle and dots OR custom buttons */}
       <div className="flex items-center justify-between mb-6">
         {/* Left - Big Circle or Custom Button */}

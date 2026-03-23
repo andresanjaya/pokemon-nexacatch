@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Star, Trophy, Filter, Search, X, Check } from 'lucide-react';
+import { ArrowLeft, Trophy, Filter, Search, X, Check } from 'lucide-react';
 import { PokedexHeader } from '../components/PokedexHeader';
 import { Pokemon } from '../types/pokemon';
 import { getPokemonLevel, getPokemonXpProgress, readCapturedPokemonFromStorage, withDefaultProgress } from '../utils/capturedPokemonProgress';
+import { getPokemonPowerTier, getPowerTierBadgeClass, getPowerTierRank } from '../utils/powerTier';
 
 interface CapturedPokemon extends Pokemon {
   rarity: number;
@@ -30,8 +31,14 @@ export function CollectionPage() {
     return pokemon.name.toLowerCase().startsWith('shiny ') || pokemon.image.includes('/shiny/');
   };
 
+  const isMegaPokemon = (pokemon: CapturedPokemon): boolean => {
+    if (pokemon.mode === 'mega') return true;
+    if (pokemon.formName?.toLowerCase().includes('mega')) return true;
+    return pokemon.name.toLowerCase().includes('mega');
+  };
+
   const getPokemonBadge = (pokemon: CapturedPokemon): 'shiny' | 'mythical' | 'legendary' | 'normal' | 'mega' => {
-    if (pokemon.mode === 'mega') return 'mega';
+    if (isMegaPokemon(pokemon)) return 'mega';
     if (isShinyPokemon(pokemon)) return 'shiny';
     if (pokemon.isMythical) return 'mythical';
     if (pokemon.isLegendary) return 'legendary';
@@ -44,8 +51,9 @@ export function CollectionPage() {
     if (savedCaptured.length > 0) {
       const captured = savedCaptured.map((pokemon) => withDefaultProgress(pokemon));
       localStorage.setItem('capturedPokemon', JSON.stringify(captured));
-      setCollection(captured);
-      setFilteredCollection(captured);
+        const filteredCaptured = captured.filter(p => p.mode !== 'rental' && !p.isRented); // Exclude rented Pokemon
+        setCollection(captured);
+        setFilteredCollection(filteredCaptured);
     } else {
       setCollection([]);
       setFilteredCollection([]);
@@ -66,24 +74,19 @@ export function CollectionPage() {
         p.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
+      filtered = filtered.filter(p => p.mode !== 'rental' && !p.isRented); // Exclude rented Pokemon
 
     // Sort
     if (sortBy === 'recent') {
       filtered.sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
     } else if (sortBy === 'rarity') {
-      filtered.sort((a, b) => b.rarity - a.rarity);
+      filtered.sort((a, b) => getPowerTierRank(getPowerTier(b)) - getPowerTierRank(getPowerTier(a)));
     } else if (sortBy === 'name') {
       filtered.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     setFilteredCollection(filtered);
   }, [collection, filterMode, searchQuery, sortBy]);
-
-  const rarityColor = (rarity: number) => {
-    if (rarity >= 5) return 'text-yellow-400';
-    if (rarity >= 3) return 'text-blue-400';
-    return 'text-gray-400';
-  };
 
   const badgeColor = (badge: 'shiny' | 'mythical' | 'legendary' | 'normal' | 'mega') => {
     if (badge === 'shiny') return 'bg-purple-500';
@@ -99,6 +102,10 @@ export function CollectionPage() {
     if (badge === 'mythical') return 'MYTHICAL';
     if (badge === 'legendary') return 'LEGENDARY';
     return 'NORMAL';
+  };
+
+  const getPowerTier = (pokemon: CapturedPokemon) => {
+    return getPokemonPowerTier(pokemon);
   };
 
   return (
@@ -160,7 +167,7 @@ export function CollectionPage() {
             className="bg-white rounded-2xl p-4 shadow-lg text-center"
           >
             <div className="text-3xl font-black text-orange-500">
-              {collection.filter(p => p.mode === 'mega').length}
+              {collection.filter((p) => isMegaPokemon(p)).length}
             </div>
             <div className="text-xs text-gray-600 mt-1">Mega</div>
           </motion.div>
@@ -226,17 +233,14 @@ export function CollectionPage() {
                   {/* Mode Badge */}
                   {(() => {
                     const badge = getPokemonBadge(pokemon);
+                    const tier = getPowerTier(pokemon);
                     return (
                   <div className="flex justify-between items-start mb-2">
                     <div className={`${badgeColor(badge)} text-white text-xs font-bold px-2 py-1 rounded-full`}>
                       {badgeLabel(badge)}
                     </div>
-                    <div className="flex gap-0.5">
-                      {Array.from({ length: pokemon.rarity }).map((_, i) => (
-                        <span key={i} className={`text-sm ${rarityColor(pokemon.rarity)}`}>
-                          ★
-                        </span>
-                      ))}
+                    <div className={`text-[11px] font-black px-2 py-1 rounded-full ${getPowerTierBadgeClass(tier)}`}>
+                      TIER {tier}
                     </div>
                   </div>
                     );
@@ -342,7 +346,7 @@ export function CollectionPage() {
                   <div className="space-y-2">
                     {[
                       { id: 'recent', label: 'Recent' },
-                      { id: 'rarity', label: 'Rarity' },
+                      { id: 'rarity', label: 'Tier' },
                       { id: 'name', label: 'Name' },
                     ].map((sort) => {
                       const active = sortBy === sort.id;

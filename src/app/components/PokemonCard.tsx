@@ -39,6 +39,7 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
   const displayDexId = pokemon.pokedexId ?? pokemon.id;
   const displayName = pokemon.speciesName || pokemon.name;
   const formLabel = pokemon.formName;
+  const cardImage = pokemon.pixelImage || pokemon.image;
 
   // Check if pokemon is favorited
   useEffect(() => {
@@ -78,18 +79,20 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
           <div className="text-sm font-medium mb-1 opacity-60">
             #{displayDexId.toString().padStart(3, '0')}
           </div>
-          <h3 className="font-bold text-xl mb-3 text-gray-900 capitalize">
+          <div>
+            <h3 className="font-bold text-xl text-gray-900 capitalize">
             {displayName}
           </h3>
-
           {formLabel && (
             <p className="text-sm text-gray-700 font-semibold mb-3 truncate">
               {formLabel}
             </p>
           )}
+          </div>
+          
           
           {/* Type badges */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap mt-3">
             {pokemon.types.map((type) => (
               <TypeBadge key={type} type={type} />
             ))}
@@ -99,7 +102,7 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
         {/* Right side - Pokemon image */}
         <div className="relative flex-shrink-0">
           <img
-            src={pokemon.image}
+            src={cardImage}
             alt={pokemon.name}
             className="w-24 h-24 object-contain relative z-10"
             style={{ imageRendering: 'pixelated' }}

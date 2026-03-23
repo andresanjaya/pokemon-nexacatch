@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { Star, ChevronRight, Shuffle, Gift, ArrowLeft } from 'lucide-react';
+import { ChevronRight, Shuffle, Gift, ArrowLeft } from 'lucide-react';
 import { Pokemon } from '../types/pokemon';
-import { fetchPokemonById, calculatePokemonRarity } from '../services/pokeapi';
+import { fetchPokemonById, fetchPokemonList, calculatePokemonRarity } from '../services/pokeapi';
 import { PokedexHeader } from '../components/PokedexHeader';
 import { TypeBadge } from '../components/TypeBadge';
 import { typeLightColors } from '../utils/typeColors';
 import { getPokemonLevel, getPokemonXpProgress, readCapturedPokemonFromStorage, withDefaultProgress } from '../utils/capturedPokemonProgress';
+import { getPokemonPowerTier, getPowerTierBadgeClass } from '../utils/powerTier';
 
 interface CapturedPokemon extends Pokemon {
   rarity: number;
@@ -31,20 +32,29 @@ export function PokemonSelectionPage() {
   const [showCollection, setShowCollection] = useState(false);
   const [selectingSlot, setSelectingSlot] = useState<number | null>(null);
   const [isRenting, setIsRenting] = useState(false);
+  const [rentalFormPool, setRentalFormPool] = useState<Pokemon[] | null>(null);
+
+  const getPowerTier = (pokemon: CapturedPokemon) => {
+    return getPokemonPowerTier(pokemon);
+  };
 
   useEffect(() => {
     const savedCaptured = readCapturedPokemonFromStorage<CapturedPokemon>();
     if (savedCaptured.length > 0) {
-      const captured = savedCaptured.map((pokemon) => withDefaultProgress(pokemon));
-      localStorage.setItem('capturedPokemon', JSON.stringify(captured));
-      setCollection(captured);
+      const ownedCaptured = savedCaptured
+        .map((pokemon) => withDefaultProgress(pokemon))
+        .filter((pokemon) => pokemon.mode !== 'rental' && !pokemon.isRented);
+
+      // Clean up old buggy rental entries from local storage.
+      localStorage.setItem('capturedPokemon', JSON.stringify(ownedCaptured));
+      setCollection(ownedCaptured);
       
       // Auto-select first 3 if available
-      if (captured.length > 0) {
+      if (ownedCaptured.length > 0) {
         const autoSelect = [
-          captured[0] || null,
-          captured[1] || null,
-          captured[2] || null,
+          ownedCaptured[0] || null,
+          ownedCaptured[1] || null,
+          ownedCaptured[2] || null,
         ];
         setSelectedSlots(autoSelect);
       }
@@ -90,6 +100,18 @@ export function PokemonSelectionPage() {
     setIsRenting(true);
 
     try {
+      let formPool = rentalFormPool;
+      if (!formPool) {
+        try {
+          const allPokemonWithForms = await fetchPokemonList(200, 1, true);
+          formPool = allPokemonWithForms.filter((pokemon) => Boolean(pokemon.formName));
+          setRentalFormPool(formPool);
+        } catch (error) {
+          console.warn('Failed to preload form pool for rental:', error);
+          formPool = [];
+        }
+      }
+
       // Generate 3 random rental Pokemon from all gens (ID 1-898)
       const rentalPokemon: CapturedPokemon[] = [];
       
@@ -108,11 +130,43 @@ export function PokemonSelectionPage() {
         rentalPokemon.push(withDefaultProgress(pokemon));
       }
 
+      // Add form variants into rental pool without removing existing random behavior.
+      if (formPool && formPool.length > 0) {
+        const slotIndices = [0, 1, 2].sort(() => Math.random() - 0.5);
+        const formSlots = Math.random() < 0.7 ? 1 : 2;
+        const usedFormIds = new Set<number>();
+
+        for (let i = 0; i < formSlots; i++) {
+          const slotIndex = slotIndices[i];
+          let attempts = 0;
+          let selectedForm: Pokemon | null = null;
+
+          while (attempts < 20 && !selectedForm) {
+            const candidate = formPool[Math.floor(Math.random() * formPool.length)];
+            if (!candidate || usedFormIds.has(candidate.id)) {
+              attempts += 1;
+              continue;
+            }
+            selectedForm = candidate;
+          }
+
+          if (!selectedForm) {
+            continue;
+          }
+
+          usedFormIds.add(selectedForm.id);
+          rentalPokemon[slotIndex] = withDefaultProgress({
+            ...selectedForm,
+            rarity: calculatePokemonRarity(selectedForm),
+            capturedAt: new Date().toISOString(),
+            mode: 'rental',
+            isRented: true,
+          });
+        }
+      }
+
       console.log('Rental Pokemon generated:', rentalPokemon);
 
-      // Add rental Pokemon to collection (temporary, for this battle only)
-      setCollection(prevCollection => [...prevCollection, ...rentalPokemon]);
-      
       // Set them to selected slots
       setSelectedSlots(rentalPokemon);
       
@@ -208,13 +262,13 @@ export function PokemonSelectionPage() {
               style={pokemon ? { backgroundColor: typeLightColors[pokemon.types[0]] } : undefined}
             >
               {/* Slot Number */}
-              <div className="absolute top-2 left-2 w-8 h-8 bg-[#DC2626] rounded-full flex items-center justify-center">
-                <span className="text-white font-black">{index + 1}</span>
+              <div className="absolute top-2 left-2 min-w-[24px] h-[18px] px-1.5 bg-[#DC2626] rounded-full flex items-center justify-center">
+                <span className="text-white text-[9px] font-black leading-none">{index + 1}</span>
               </div>
 
               {/* Rental Badge */}
               {pokemon?.isRented && (
-                <div className="absolute top-2 right-2 bg-[#DC2626] text-white text-xs font-black px-2 py-1 rounded-full">
+                <div className="absolute top-2 right-2 bg-[#DC2626] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
                   RENTAL
                 </div>
               )}
@@ -245,18 +299,8 @@ export function PokemonSelectionPage() {
                     </p>
                   </div>
                   
-                  {/* Rarity Stars */}
-                  <div className="flex gap-0.5 mb-2">
-                    {Array.from({ length: pokemon.rarity }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-3 h-3 ${
-                          pokemon.rarity >= 5 ? 'text-yellow-400 fill-yellow-400' :
-                          pokemon.rarity >= 3 ? 'text-blue-400 fill-blue-400' :
-                          'text-gray-400 fill-gray-400'
-                        }`}
-                      />
-                    ))}
+                  <div className={`px-2 py-1 rounded-full text-[10px] font-black mb-2 ${getPowerTierBadgeClass(getPowerTier(pokemon))}`}>
+                    TIER {getPowerTier(pokemon)}
                   </div>
 
                   {/* Type Badge */}
@@ -389,18 +433,9 @@ export function PokemonSelectionPage() {
                         </p>
                       </div>
                       <div className="flex justify-center gap-0.5 mt-1">
-                                          
-                  
-                        {Array.from({ length: pokemon.rarity }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-3 h-3 ${
-                              pokemon.rarity >= 5 ? 'text-yellow-400 fill-yellow-400' :
-                              pokemon.rarity >= 3 ? 'text-blue-400 fill-blue-400' :
-                              'text-gray-400 fill-gray-400'
-                            }`}
-                          />
-                        ))}
+                        <div className={`px-2 py-1 rounded-full text-[10px] font-black ${getPowerTierBadgeClass(getPowerTier(pokemon))}`}>
+                          TIER {getPowerTier(pokemon)}
+                        </div>
                       </div>
                     </motion.button>
                   ))}

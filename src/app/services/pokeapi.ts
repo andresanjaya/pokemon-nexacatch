@@ -131,9 +131,10 @@ interface PokeAPIResponse {
   weight: number;
   height: number;
   sprites: {
+    front_default: string | null;
     other: {
       'official-artwork': {
-        front_default: string;
+        front_default: string | null;
       };
     };
   };
@@ -186,6 +187,16 @@ interface PokeAPIPokemonListResponse {
   results: PokeAPIPokemonListEntry[];
 }
 
+interface PokeAPIAbilityResponse {
+  effect_entries: Array<{
+    effect: string;
+    short_effect: string;
+    language: {
+      name: string;
+    };
+  }>;
+}
+
 export interface BattleMove {
   name: string;
   power: number;
@@ -206,6 +217,7 @@ export interface MegaFormInfo {
 
 const moveDetailsCache = new Map<string, BattleMove | null>();
 const typeEffectivenessCache = new Map<PokemonType, Map<PokemonType, number>>();
+const abilityDescriptionCache = new Map<string, string>();
 
 interface EvolutionChain {
   species: {
@@ -274,6 +286,45 @@ const capitalize = (str: string): string => {
 // Format ability name
 const formatAbilityName = (name: string): string => {
   return name.split('-').map(capitalize).join(' ');
+};
+
+const formatAbilityApiName = (name: string): string => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\./g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+};
+
+export const fetchAbilityDescription = async (abilityName: string): Promise<string> => {
+  const normalized = formatAbilityApiName(abilityName);
+
+  if (!normalized) {
+    return 'No description available for this ability.';
+  }
+
+  const cached = abilityDescriptionCache.get(normalized);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const response = await fetchWithRetry(`${POKEAPI_BASE_URL}/ability/${normalized}`);
+    const data: PokeAPIAbilityResponse = await response.json();
+    const englishEntry = data.effect_entries.find((entry) => entry.language.name === 'en');
+
+    const description =
+      englishEntry?.short_effect?.replace(/\n|\f/g, ' ').trim() ||
+      englishEntry?.effect?.replace(/\n|\f/g, ' ').trim() ||
+      'No description available for this ability.';
+
+    abilityDescriptionCache.set(normalized, description);
+    return description;
+  } catch (error) {
+    console.warn(`Failed to fetch ability description for ${abilityName}:`, error);
+    return 'No description available for this ability.';
+  }
 };
 
 const formatPokemonName = (name: string): string => {
@@ -455,6 +506,7 @@ export const fetchPokemonById = async (id: number): Promise<Pokemon> => {
       abilities: data.abilities.slice(0, 2).map(a => formatAbilityName(a.ability.name)),
       description,
       image: getPokemonSpriteUrl(data.id),
+      pixelImage: getPokemonSpriteUrl(data.id), // Use animated GIF sprites
       isLegendary: speciesData.is_legendary || speciesData.is_mythical,
       isMythical: speciesData.is_mythical,
       evolution,
@@ -523,6 +575,7 @@ export const fetchPokemonList = async (
                 image:
                   data.sprites.other['official-artwork'].front_default ||
                   getStaticSpriteUrl(data.id),
+                pixelImage: data.sprites.front_default || undefined,
                 weight: data.weight,
                 height: data.height,
                 weaknesses: getWeaknesses(data.types.map((t) => mapPokemonType(t.type.name))),
