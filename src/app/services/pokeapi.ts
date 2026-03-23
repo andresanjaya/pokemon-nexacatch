@@ -23,6 +23,12 @@ const EVENT_SHINY_IDS = [
   6, 59, 94, 130, 143, 149, 196, 248, 282, 373, 448, 635, 700,
 ];
 
+const MEGA_SPECIES_IDS = [
+  3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150, 181, 208, 212, 214,
+  229, 248, 254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354,
+  359, 362, 373, 376, 380, 381, 384, 428, 445, 448, 460, 475, 531, 719,
+];
+
 const pickRandomFrom = <T>(list: T[]): T => {
   return list[Math.floor(Math.random() * list.length)];
 };
@@ -99,6 +105,23 @@ interface PokeAPISpecies {
   is_mythical: boolean;
 }
 
+interface PokeAPISpeciesVariety {
+  is_default: boolean;
+  pokemon: {
+    name: string;
+    url: string;
+  };
+}
+
+interface PokeAPISpeciesDetailResponse {
+  varieties: PokeAPISpeciesVariety[];
+}
+
+interface PokeAPIPokemonFormResponse {
+  form_name: string;
+  is_mega: boolean;
+}
+
 interface PokeAPIResponse {
   id: number;
   name: string;
@@ -153,12 +176,32 @@ interface PokeAPITypeDamageRelationsResponse {
   };
 }
 
+interface PokeAPIPokemonListEntry {
+  name: string;
+  url: string;
+}
+
+interface PokeAPIPokemonListResponse {
+  count: number;
+  results: PokeAPIPokemonListEntry[];
+}
+
 export interface BattleMove {
   name: string;
   power: number;
   accuracy: number | null;
   type: PokemonType;
   damageClass: 'physical' | 'special';
+}
+
+export interface MegaFormInfo {
+  id: number;
+  pokedexId: number;
+  name: string;
+  baseName: string;
+  formName: string;
+  image: string;
+  types: PokemonType[];
 }
 
 const moveDetailsCache = new Map<string, BattleMove | null>();
@@ -231,6 +274,25 @@ const capitalize = (str: string): string => {
 // Format ability name
 const formatAbilityName = (name: string): string => {
   return name.split('-').map(capitalize).join(' ');
+};
+
+const formatPokemonName = (name: string): string => {
+  return name
+    .split('-')
+    .map(capitalize)
+    .join(' ');
+};
+
+const extractFormName = (fullName: string, speciesName: string): string | undefined => {
+  if (fullName === speciesName) {
+    return undefined;
+  }
+
+  if (fullName.startsWith(`${speciesName} `)) {
+    return fullName.slice(speciesName.length + 1);
+  }
+
+  return fullName;
 };
 
 // Get Pokemon ID from species URL
@@ -375,7 +437,11 @@ export const fetchPokemonById = async (id: number): Promise<Pokemon> => {
     // Map to our Pokemon interface
     const pokemon: Pokemon = {
       id: data.id,
+      pokedexId: getIdFromUrl(data.species.url),
       name: capitalize(data.name),
+      speciesName: formatPokemonName(data.species.name),
+      formName: extractFormName(formatPokemonName(data.name), formatPokemonName(data.species.name)),
+      hasAlternateForms: (speciesData.varieties?.length ?? 1) > 1,
       genus,
       types: data.types.map(t => mapPokemonType(t.type.name)),
       stats: {
@@ -406,10 +472,96 @@ export const fetchPokemonById = async (id: number): Promise<Pokemon> => {
 
 // Fetch multiple Pokemon with pagination support
 export const fetchPokemonList = async (
-  limit: number = 200, 
-  page: number = 1
+  limit: number = 200,
+  page: number = 1,
+  includeForms: boolean = false
 ): Promise<Pokemon[]> => {
   try {
+    if (includeForms) {
+      const countResponse = await fetchWithRetry(`${POKEAPI_BASE_URL}/pokemon?limit=1`);
+      const countData: PokeAPIPokemonListResponse = await countResponse.json();
+      const totalCount = countData.count;
+
+      const listResponse = await fetchWithRetry(`${POKEAPI_BASE_URL}/pokemon?limit=${totalCount}&offset=0`);
+      const listData: PokeAPIPokemonListResponse = await listResponse.json();
+
+      const results: Pokemon[] = [];
+      const batchSize = 60;
+      const entries = listData.results || [];
+
+      for (let start = 0; start < entries.length; start += batchSize) {
+        const end = Math.min(start + batchSize, entries.length);
+        const batch = entries.slice(start, end);
+
+        const batchResults = await Promise.all(
+          batch.map(async (entry) => {
+            try {
+              const response = await fetchWithRetry(entry.url);
+              const data: PokeAPIResponse = await response.json();
+              const pokedexId = getIdFromUrl(data.species.url);
+              const speciesName = formatPokemonName(data.species.name);
+              const fullName = formatPokemonName(data.name);
+
+              return {
+                id: data.id,
+                pokedexId,
+                name: fullName,
+                speciesName,
+                formName: extractFormName(fullName, speciesName),
+                genus: speciesName,
+                types: data.types.map((t) => mapPokemonType(t.type.name)),
+                stats: {
+                  hp: data.stats.find((s) => s.stat.name === 'hp')?.base_stat || 0,
+                  attack: data.stats.find((s) => s.stat.name === 'attack')?.base_stat || 0,
+                  defense: data.stats.find((s) => s.stat.name === 'defense')?.base_stat || 0,
+                  specialAttack: data.stats.find((s) => s.stat.name === 'special-attack')?.base_stat || 0,
+                  specialDefense: data.stats.find((s) => s.stat.name === 'special-defense')?.base_stat || 0,
+                  speed: data.stats.find((s) => s.stat.name === 'speed')?.base_stat || 0,
+                },
+                abilities: data.abilities.slice(0, 2).map((a) => formatAbilityName(a.ability.name)),
+                description: '',
+                image:
+                  data.sprites.other['official-artwork'].front_default ||
+                  getStaticSpriteUrl(data.id),
+                weight: data.weight,
+                height: data.height,
+                weaknesses: getWeaknesses(data.types.map((t) => mapPokemonType(t.type.name))),
+              } as Pokemon;
+            } catch (error) {
+              console.warn(`Skipping Pokemon form from ${entry.url}:`, error);
+              return null;
+            }
+          })
+        );
+
+        const validResults = batchResults.filter((p): p is Pokemon => p !== null);
+        results.push(...validResults);
+      }
+
+      const sorted = results.sort((a, b) => {
+        const leftDex = a.pokedexId ?? a.id;
+        const rightDex = b.pokedexId ?? b.id;
+        if (leftDex !== rightDex) {
+          return leftDex - rightDex;
+        }
+        return a.id - b.id;
+      });
+
+      const speciesCounts = new Map<number, number>();
+      sorted.forEach((pokemon) => {
+        const dexId = pokemon.pokedexId ?? pokemon.id;
+        speciesCounts.set(dexId, (speciesCounts.get(dexId) || 0) + 1);
+      });
+
+      return sorted.map((pokemon) => {
+        const dexId = pokemon.pokedexId ?? pokemon.id;
+        return {
+          ...pokemon,
+          hasAlternateForms: (speciesCounts.get(dexId) || 0) > 1,
+        };
+      });
+    }
+
     const results: Pokemon[] = [];
     const batchSize = 50; // Load 50 at a time to avoid rate limiting
     
@@ -627,4 +779,167 @@ export const getTypeEffectivenessMultiplier = async (
     const value = map.get(defenderType) ?? 1;
     return multiplier * value;
   }, 1);
+};
+
+/**
+ * Get mega forms for a Pokemon species by id or name.
+ * Example inputs: 6, "charizard", "mewtwo".
+ */
+export const fetchPokemonMegaForms = async (
+  pokemonNameOrId: string | number
+): Promise<MegaFormInfo[]> => {
+  const speciesResponse = await fetchWithRetry(
+    `${POKEAPI_BASE_URL}/pokemon-species/${pokemonNameOrId}`
+  );
+  const speciesData: PokeAPISpeciesDetailResponse = await speciesResponse.json();
+
+  const varieties = speciesData.varieties || [];
+
+  const megaCandidates = await Promise.all(
+    varieties.map(async (variety) => {
+      const varietyName = variety.pokemon.name;
+
+      try {
+        const formResponse = await fetchWithRetry(
+          `${POKEAPI_BASE_URL}/pokemon-form/${varietyName}`
+        );
+        const formData: PokeAPIPokemonFormResponse = await formResponse.json();
+
+        if (!formData.is_mega) {
+          return null;
+        }
+
+        const pokemonResponse = await fetchWithRetry(
+          `${POKEAPI_BASE_URL}/pokemon/${varietyName}`
+        );
+        const pokemonData: PokeAPIResponse = await pokemonResponse.json();
+
+        return {
+          id: pokemonData.id,
+          pokedexId: getIdFromUrl(pokemonData.species.url),
+          name: formatPokemonName(pokemonData.name),
+          baseName: formatPokemonName(pokemonData.species.name),
+          formName: formData.form_name ? capitalize(formData.form_name) : 'Mega',
+          image:
+            pokemonData.sprites.other['official-artwork'].front_default ||
+            getStaticSpriteUrl(pokemonData.id),
+          types: pokemonData.types.map((typeEntry) => mapPokemonType(typeEntry.type.name)),
+        } as MegaFormInfo;
+      } catch (error) {
+        console.warn(`Failed to check mega form for ${varietyName}:`, error);
+        return null;
+      }
+    })
+  );
+
+  return megaCandidates
+    .filter((megaForm): megaForm is MegaFormInfo => megaForm !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
+
+/**
+ * Fast check to determine whether a Pokemon has at least one mega form.
+ */
+export const hasMegaForms = async (pokemonNameOrId: string | number): Promise<boolean> => {
+  const megaForms = await fetchPokemonMegaForms(pokemonNameOrId);
+  return megaForms.length > 0;
+};
+
+export const fetchRandomMegaPokemon = async (): Promise<Pokemon> => {
+  const maxAttempts = 16;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const speciesId = pickRandomFrom(MEGA_SPECIES_IDS);
+
+    try {
+      const megaForms = await fetchPokemonMegaForms(speciesId);
+      if (megaForms.length === 0) {
+        continue;
+      }
+
+      const pickedForm = pickRandomFrom(megaForms);
+      const basePokemon = await fetchPokemonById(pickedForm.id);
+
+      return {
+        ...basePokemon,
+        name: pickedForm.name,
+        image: pickedForm.image,
+        types: pickedForm.types,
+      };
+    } catch (error) {
+      console.warn(`Mega roll failed for species ${speciesId}:`, error);
+    }
+  }
+
+  throw new Error('Failed to find a mega pokemon for mega battle mode');
+};
+
+export const fetchRandomAlternateFormPokemon = async (): Promise<Pokemon> => {
+  const maxAttempts = 24;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const speciesId = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
+
+    try {
+      const speciesResponse = await fetchWithRetry(
+        `${POKEAPI_BASE_URL}/pokemon-species/${speciesId}`
+      );
+      const speciesData: PokeAPISpeciesDetailResponse = await speciesResponse.json();
+
+      const nonDefaultVarieties = (speciesData.varieties || []).filter((variety) => !variety.is_default);
+      if (nonDefaultVarieties.length === 0) {
+        continue;
+      }
+
+      const validForms = await Promise.all(
+        nonDefaultVarieties.map(async (variety) => {
+          const varietyName = variety.pokemon.name;
+
+          try {
+            const formResponse = await fetchWithRetry(
+              `${POKEAPI_BASE_URL}/pokemon-form/${varietyName}`
+            );
+            const formData: PokeAPIPokemonFormResponse = await formResponse.json();
+
+            if (formData.is_mega) {
+              return null;
+            }
+
+            const pokemonResponse = await fetchWithRetry(
+              `${POKEAPI_BASE_URL}/pokemon/${varietyName}`
+            );
+            const pokemonData: PokeAPIResponse = await pokemonResponse.json();
+
+            return {
+              id: pokemonData.id,
+              name: formatPokemonName(pokemonData.name),
+              image:
+                pokemonData.sprites.other['official-artwork'].front_default ||
+                getStaticSpriteUrl(pokemonData.id),
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const candidates = validForms.filter((form): form is { id: number; name: string; image: string } => form !== null);
+      if (candidates.length === 0) {
+        continue;
+      }
+
+      const selected = pickRandomFrom(candidates);
+      const basePokemon = await fetchPokemonById(selected.id);
+
+      return {
+        ...basePokemon,
+        name: selected.name,
+        image: selected.image,
+      };
+    } catch {
+      // Try another species candidate.
+    }
+  }
+
+  throw new Error('Failed to find alternate form pokemon');
 };

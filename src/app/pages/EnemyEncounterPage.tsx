@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router';
 import { motion } from 'motion/react';
 import { Zap, Swords, ArrowLeft } from 'lucide-react';
 import { Pokemon } from '../types/pokemon';
-import { fetchPokemonById, fetchRandomEventPokemon, fetchRandomLegendaryPokemon } from '../services/pokeapi';
+import { fetchPokemonById, fetchRandomEventPokemon, fetchRandomLegendaryPokemon, fetchRandomMegaPokemon, fetchRandomAlternateFormPokemon } from '../services/pokeapi';
 import { PokedexHeader } from '../components/PokedexHeader';
 
 interface CapturedPokemon extends Pokemon {
@@ -105,9 +105,37 @@ export function EnemyEncounterPage() {
               speed: Math.floor(enemyPokemon.stats.speed * 1.03),
             },
           };
+        } else if (modeData === 'mega') {
+          console.log('Mega Raid mode: fetching mega evolution enemy');
+          enemyPokemon = await fetchRandomMegaPokemon();
+
+          // Mega mode should feel as hard as boss battles.
+          enemyPokemon = {
+            ...enemyPokemon,
+            stats: {
+              ...enemyPokemon.stats,
+              hp: Math.floor(enemyPokemon.stats.hp * 1.3),
+              attack: Math.floor(enemyPokemon.stats.attack * 1.1),
+              defense: Math.floor(enemyPokemon.stats.defense * 1.1),
+              specialAttack: Math.floor(enemyPokemon.stats.specialAttack * 1.1),
+              specialDefense: Math.floor(enemyPokemon.stats.specialDefense * 1.1),
+              speed: Math.floor(enemyPokemon.stats.speed * 1),
+            },
+          };
         } else {
-          const randomId = Math.floor(Math.random() * 898) + 1;
-          enemyPokemon = await fetchPokemonById(randomId);
+          const shouldUseAlternateForm = Math.random() < 0.12;
+
+          if (shouldUseAlternateForm) {
+            try {
+              enemyPokemon = await fetchRandomAlternateFormPokemon();
+            } catch {
+              const randomId = Math.floor(Math.random() * 898) + 1;
+              enemyPokemon = await fetchPokemonById(randomId);
+            }
+          } else {
+            const randomId = Math.floor(Math.random() * 898) + 1;
+            enemyPokemon = await fetchPokemonById(randomId);
+          }
         }
 
         console.log('✅ Enemy Pokemon fetched:', enemyPokemon.name);

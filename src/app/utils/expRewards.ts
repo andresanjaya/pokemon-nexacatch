@@ -1,7 +1,7 @@
-export type BattleMode = 'normal' | 'event' | 'boss';
+export type BattleMode = 'normal' | 'event' | 'boss' | 'mega';
 
 const normalizeBattleMode = (mode?: string): BattleMode => {
-  if (mode === 'boss' || mode === 'event') {
+  if (mode === 'boss' || mode === 'event' || mode === 'mega') {
     return mode;
   }
 
@@ -12,12 +12,14 @@ const PLAYER_BATTLE_XP: Record<BattleMode, { win: number; lose: number }> = {
   normal: { win: 42, lose: 20 },
   event: { win: 62, lose: 28 },
   boss: { win: 90, lose: 38 },
+  mega: { win: 90, lose: 38 },
 };
 
 const CAPTURE_SUCCESS_BONUS: Record<BattleMode, number> = {
   normal: 18,
   event: 26,
   boss: 40,
+  mega: 40,
 };
 
 const CAPTURE_FAIL_CONSOLATION = 8;

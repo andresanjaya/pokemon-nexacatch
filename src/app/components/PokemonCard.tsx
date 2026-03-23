@@ -36,6 +36,9 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
   const primaryType = pokemon.types[0];
   const cardBgColor = cardTypeColors[primaryType] || '#E0E0E0';
   const [isFavorite, setIsFavorite] = useState(false);
+  const displayDexId = pokemon.pokedexId ?? pokemon.id;
+  const displayName = pokemon.speciesName || pokemon.name;
+  const formLabel = pokemon.formName;
 
   // Check if pokemon is favorited
   useEffect(() => {
@@ -73,11 +76,17 @@ export function PokemonCard({ pokemon }: PokemonCardProps) {
         {/* Left side - Pokemon info */}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium mb-1 opacity-60">
-            #{pokemon.id.toString().padStart(3, '0')}
+            #{displayDexId.toString().padStart(3, '0')}
           </div>
           <h3 className="font-bold text-xl mb-3 text-gray-900 capitalize">
-            {pokemon.name}
+            {displayName}
           </h3>
+
+          {formLabel && (
+            <p className="text-sm text-gray-700 font-semibold mb-3 truncate">
+              {formLabel}
+            </p>
+          )}
           
           {/* Type badges */}
           <div className="flex gap-2 flex-wrap">

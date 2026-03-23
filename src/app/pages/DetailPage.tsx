@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Heart, Weight, Ruler, Zap, Shield, ChevronLeft, ChevronRight, Dna } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { usePokemonById } from '../hooks/usePokemon';
+import { fetchPokemonMegaForms, MegaFormInfo } from '../services/pokeapi';
 import { TypeBadge } from '../components/TypeBadge';
 import { StatBar } from '../components/StatBar';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,6 +15,8 @@ export function DetailPage(): JSX.Element {
   const navigate = useNavigate();
   const { pokemon, loading, error } = usePokemonById(Number(id));
   const [isFavorite, setIsFavorite] = useState(false);
+  const [megaForms, setMegaForms] = useState<MegaFormInfo[]>([]);
+  const [loadingMegaForms, setLoadingMegaForms] = useState(false);
 
   // Check if pokemon is favorited
   useEffect(() => {
@@ -24,6 +27,39 @@ export function DetailPage(): JSX.Element {
         setIsFavorite(ids.includes(pokemon.id));
       }
     }
+  }, [pokemon]);
+
+  // Load mega forms for this pokemon species
+  useEffect(() => {
+    if (!pokemon) {
+      setMegaForms([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingMegaForms(true);
+
+    fetchPokemonMegaForms(pokemon.id)
+      .then((forms) => {
+        if (!cancelled) {
+          setMegaForms(forms);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load mega forms:', err);
+        if (!cancelled) {
+          setMegaForms([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingMegaForms(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [pokemon]);
 
   const toggleFavorite = () => {
@@ -88,6 +124,7 @@ export function DetailPage(): JSX.Element {
   }
 
   const primaryColor = typeColors[pokemon.types[0]];
+  const displayDexId = pokemon.pokedexId ?? pokemon.id;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -148,7 +185,7 @@ export function DetailPage(): JSX.Element {
           
           {/* Pokemon ID */}
           <p className="text-gray-400 font-bold text-base mb-4">
-            #{pokemon.id.toString().padStart(3, '0')}
+            #{displayDexId.toString().padStart(3, '0')}
           </p>
 
           {/* Types */}
@@ -304,7 +341,7 @@ export function DetailPage(): JSX.Element {
                   {pokemon.name}
                 </p>
                 <p className="text-xs text-gray-500">
-                  #{pokemon.id.toString().padStart(3, '0')}
+                  #{displayDexId.toString().padStart(3, '0')}
                 </p>
               </div>
 
@@ -333,6 +370,47 @@ export function DetailPage(): JSX.Element {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mega Evolution */}
+      {!loadingMegaForms && megaForms.length > 0 && (
+        <div className="px-4 mb-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xl">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              Mega Evolution
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {megaForms.map((megaForm) => (
+                <button
+                  key={megaForm.id}
+                  onClick={() => navigate(`/pokemon/${megaForm.id}`)}
+                  className="w-full text-left bg-gray-50 border border-gray-200 rounded-2xl p-4 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={megaForm.image}
+                      alt={megaForm.name}
+                      className="w-16 h-16 object-contain"
+                      style={{ imageRendering: 'pixelated' }}
+                    />
+
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 text-sm truncate">{megaForm.name}</p>
+                      <p className="text-xs text-gray-500">#{(megaForm.pokedexId ?? megaForm.id).toString().padStart(3, '0')}</p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {megaForm.types.map((type) => (
+                          <TypeBadge key={`${megaForm.id}-${type}`} type={type} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>

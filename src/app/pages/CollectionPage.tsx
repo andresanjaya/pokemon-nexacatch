@@ -22,7 +22,7 @@ export function CollectionPage() {
   const [collection, setCollection] = useState<CapturedPokemon[]>([]);
   const [filteredCollection, setFilteredCollection] = useState<CapturedPokemon[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'normal' | 'legendary' | 'mythical' | 'shiny'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'normal' | 'legendary' | 'mythical' | 'shiny' | 'mega'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'rarity' | 'name'>('recent');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
 
@@ -30,7 +30,8 @@ export function CollectionPage() {
     return pokemon.name.toLowerCase().startsWith('shiny ') || pokemon.image.includes('/shiny/');
   };
 
-  const getPokemonBadge = (pokemon: CapturedPokemon): 'shiny' | 'mythical' | 'legendary' | 'normal' => {
+  const getPokemonBadge = (pokemon: CapturedPokemon): 'shiny' | 'mythical' | 'legendary' | 'normal' | 'mega' => {
+    if (pokemon.mode === 'mega') return 'mega';
     if (isShinyPokemon(pokemon)) return 'shiny';
     if (pokemon.isMythical) return 'mythical';
     if (pokemon.isLegendary) return 'legendary';
@@ -84,15 +85,17 @@ export function CollectionPage() {
     return 'text-gray-400';
   };
 
-  const badgeColor = (badge: 'shiny' | 'mythical' | 'legendary' | 'normal') => {
+  const badgeColor = (badge: 'shiny' | 'mythical' | 'legendary' | 'normal' | 'mega') => {
     if (badge === 'shiny') return 'bg-purple-500';
+    if (badge === 'mega') return 'bg-orange-500';
     if (badge === 'mythical') return 'bg-pink-500';
     if (badge === 'legendary') return 'bg-yellow-500';
     return 'bg-green-500';
   };
 
-  const badgeLabel = (badge: 'shiny' | 'mythical' | 'legendary' | 'normal') => {
+  const badgeLabel = (badge: 'shiny' | 'mythical' | 'legendary' | 'normal' | 'mega') => {
     if (badge === 'shiny') return 'SHINY';
+    if (badge === 'mega') return 'MEGA';
     if (badge === 'mythical') return 'MYTHICAL';
     if (badge === 'legendary') return 'LEGENDARY';
     return 'NORMAL';
@@ -115,7 +118,7 @@ export function CollectionPage() {
 
       <div className="p-4">
         {/* Stats Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-3 mb-6">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -148,6 +151,18 @@ export function CollectionPage() {
               {collection.filter(p => p.isMythical).length}
             </div>
             <div className="text-xs text-gray-600 mt-1">Mythical</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-2xl p-4 shadow-lg text-center"
+          >
+            <div className="text-3xl font-black text-orange-500">
+              {collection.filter(p => p.mode === 'mega').length}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">Mega</div>
           </motion.div>
         </div>
 
@@ -302,12 +317,12 @@ export function CollectionPage() {
                 <div className="mb-4">
                   <p className="text-sm font-bold text-gray-700 mb-2">Category</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {['all', 'normal', 'legendary', 'mythical', 'shiny'].map((mode) => {
+                    {['all', 'normal', 'legendary', 'mythical', 'shiny', 'mega'].map((mode) => {
                       const active = filterMode === mode;
                       return (
                         <button
                           key={mode}
-                          onClick={() => setFilterMode(mode as 'all' | 'normal' | 'legendary' | 'mythical' | 'shiny')}
+                          onClick={() => setFilterMode(mode as 'all' | 'normal' | 'legendary' | 'mythical' | 'shiny' | 'mega')}
                           className={`px-4 py-3 rounded-xl text-sm font-semibold flex items-center justify-between transition-all ${
                             active
                               ? 'bg-blue-500 text-white'

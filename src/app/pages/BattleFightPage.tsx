@@ -34,6 +34,7 @@ interface CapturedPokemon extends Pokemon {
 
 const getEnemyHpMultiplier = (battleMode?: string): number => {
   if (battleMode === 'boss') return 3;
+  if (battleMode === 'mega') return 3;
   if (battleMode === 'event') return 2.7;
   return 2.4;
 };

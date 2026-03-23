@@ -13,7 +13,7 @@ export const usePokemonList = () => {
 
   const QUICK_LOAD_COUNT = 151;
   const TOTAL_POKEMON = 898;
-  const CACHE_KEY = 'pokemonFullCacheV1';
+  const CACHE_KEY = 'pokemonFullCacheV2';
   const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
   const cacheFullDataset = (data: Pokemon[]) => {
@@ -57,7 +57,7 @@ export const usePokemonList = () => {
     fullLoadPromiseRef.current = (async () => {
       setLoadingMore(true);
       try {
-        const fullData = await fetchPokemonList(TOTAL_POKEMON, 1);
+        const fullData = await fetchPokemonList(TOTAL_POKEMON, 1, true);
         setPokemon(fullData);
         setGlobalReady(true);
         setHasMore(false);

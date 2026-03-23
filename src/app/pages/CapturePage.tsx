@@ -26,7 +26,7 @@ export function CapturePage() {
   const [rarity, setRarity] = useState(1);
 
   // Calculate capture probability based on mode
-  const baseProbability = mode === 'normal' ? 0.7 : mode === 'boss' ? 0.3 : 0.5;
+  const baseProbability = mode === 'normal' ? 0.7 : (mode === 'boss' || mode === 'mega') ? 0.3 : 0.5;
   const successZoneStart = 40;
   const successZoneEnd = 60;
 

@@ -89,7 +89,10 @@ export function PokedexPage() {
     if (regionStart && regionEnd) {
       const start = parseInt(regionStart);
       const end = parseInt(regionEnd);
-      result = result.filter((p) => p.id >= start && p.id <= end);
+      result = result.filter((p) => {
+        const dexId = p.pokedexId ?? p.id;
+        return dexId >= start && dexId <= end;
+      });
     }
 
     // Filter by search
@@ -113,6 +116,11 @@ export function PokedexPage() {
       }
 
       if (sortBy === 'id') {
+        const leftDex = a.pokedexId ?? a.id;
+        const rightDex = b.pokedexId ?? b.id;
+        if (leftDex !== rightDex) {
+          return (leftDex - rightDex) * direction;
+        }
         return (a.id - b.id) * direction;
       }
 

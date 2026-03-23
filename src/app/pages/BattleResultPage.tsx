@@ -359,11 +359,11 @@ export function BattleResultPage() {
                       <Trophy className="w-5 h-5 text-purple-600" />
                     </div>
                     <span className="font-semibold text-[#1f1e2d]">
-                      {mode === 'boss' ? 'Boss Bonus' : 'Event Bonus'}
+                      {mode === 'boss' ? 'Boss Bonus' : mode === 'mega' ? 'Mega Bonus' : 'Event Bonus'}
                     </span>
                   </div>
                   <span className="font-black text-purple-600 text-lg">
-                    +{mode === 'boss' ? '100' : '50'} XP
+                    +{mode === 'boss' || mode === 'mega' ? '100' : '50'} XP
                   </span>
                 </div>
               )}

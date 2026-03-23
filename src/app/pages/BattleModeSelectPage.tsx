@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { PokedexHeader } from '../components/PokedexHeader';
-import { ArrowLeft, Zap, Crown, Star, TrendingUp, Trophy } from 'lucide-react';
+import { ArrowLeft, Zap, Crown, Star, Sparkles, TrendingUp, Trophy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getXpRequiredForNextLevel } from '../utils/playerProgress';
 
@@ -46,6 +46,18 @@ export function BattleModeSelectPage() {
       rewards: ['Shiny Pokemon', '150-250 XP'],
       minLevel: 1,
       badge: 'SHINY',
+    },
+    {
+      id: 'mega',
+      title: 'Mega Raid',
+      description: 'Challenge Mega Evolution Pokémon with boss-tier difficulty and capture them',
+      difficulty: 'Hard',
+      difficultyColor: 'text-red-700',
+      icon: Sparkles,
+      color: 'from-orange-500 to-red-600',
+      rewards: ['Mega Pokémon', '200-300 XP'],
+      minLevel: 1,
+      badge: 'MEGA',
     },
   ];
 
